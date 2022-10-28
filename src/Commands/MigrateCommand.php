@@ -3,6 +3,7 @@
 namespace Nwidart\Modules\Commands;
 
 use Illuminate\Console\Command;
+use Illuminate\Support\Collection;
 use Nwidart\Modules\Migrations\Migrator;
 use Nwidart\Modules\Module;
 use Symfony\Component\Console\Input\InputArgument;
@@ -42,19 +43,31 @@ class MigrateCommand extends Command
 
         if ($name) {
             $module = $this->module->findOrFail($name);
-
             $this->migrate($module);
 
             return 0;
         }
 
-        foreach ($this->module->getOrdered($this->option('direction')) as $module) {
+        $this->sortingMigrationFiles()->each(function ($module) {
             $this->line('Running for module: <info>' . $module->getName() . '</info>');
 
             $this->migrate($module);
-        }
+        });
 
         return 0;
+    }
+
+    /**
+     * Sorting Migration files in the same order they are created
+     * regardless the module, to avoid any issues related to foreign keys
+     *
+     * @return void
+     */
+    protected function sortingMigrationFiles(): Collection
+    {
+        return $this->module->toCollection()
+            ->sortBy(fn($module) => (new Migrator($module, $this->getLaravel()))->getMigrations(),
+                constant('SORT_' . strtoupper($this->option('direction'))));
     }
 
     /**
